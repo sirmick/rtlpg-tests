@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """test_topo.py - two switches, cabled, each running the real firmware.
 
-    tests/net/test_topo.py IMAGE [--rtlsim build/rtlsim]
+    net/test_topo.py IMAGE [--rtlsim build/rtlsim]
 
 Switches a and b (tools/rtlswitch.py Net), a cable between their front ports
 4, hosts h1 on a.1, h2 on b.1 and h3 on b.2, configured only through the
@@ -17,9 +17,12 @@ firmwares' CLIs. Checks:
 Needs sudo; skipped without it.
 """
 import argparse, os, re, subprocess, sys, time
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "../lib"))
+import paths
 HERE = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, os.path.join(HERE, "../../tools"))
+sys.path.insert(0, os.path.join(paths.OVS, "tools"))
 from rtlswitch import Net
+import fwcli
 
 failures = 0
 IP = {"a": "192.168.2.2", "b": "192.168.2.3", "h1": "192.168.2.11", "h2": "192.168.2.12", "h3": "192.168.2.13"}
@@ -47,14 +50,14 @@ def link_seen(c, port, up, start, timeout):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("image")
-    ap.add_argument("--rtlsim", default=os.path.join(HERE, "../../build/rtlsim"))
+    ap.add_argument("--rtlsim", default=paths.RTLSIM)
     a = ap.parse_args()
     if subprocess.run(["sudo", "-n", "true"], capture_output=True).returncode:
         print("topo: no passwordless sudo, skipped")
         return 0
 
     topo = {
-        "switches": {"a": {"ip": IP["a"]}, "b": {"ip": IP["b"]}},
+        "switches": {"a": {}, "b": {}},	# their addresses: by fwcli, below
         "links": [["a.4", "b.4"]],
         "hosts": {"h1": {"port": "a.1", "ip": IP["h1"] + "/24"}, "h2": {"port": "b.1", "ip": IP["h2"] + "/24"},
                   "h3": {"port": "b.2", "ip": IP["h3"] + "/24"}},
@@ -70,34 +73,38 @@ def main():
 
     try:
         net.start()
+        fw = {sw: fwcli.FwCli(fwcli.console_sender(net.labs[sw].console)) for sw in "ab"}
+        for sw in "ab":
+            fw[sw].config(f"ip {IP[sw]}")
         time.sleep(1)
+
+        def l2(sw):	# the l2 table, as "path value" text, either firmware's
+            return "\n".join(f"{p} {v}" for p, v in fw[sw].read("l2").items())
         ma, mb = net.mac("a"), net.mac("b")
         check(ma and mb and ma != mb, f"the two chips have their own MACs: a {ma}, b {mb}")
-        check(IP["a"] in net.cli("a", "ip") and IP["b"] in net.cli("b", "ip"),
+        check(all(fw[sw].read("ip").get("state.mgmt.ip") == IP[sw] for sw in "ab"),
               f"each switch has its own address: a {IP['a']}, b {IP['b']}")
 
         check(ping("h1", "h2") and ping("h1", "h3") and ping("h2", "h3"),
               "h1 on a reaches h2 and h3 on b across the cable")
         check(ping("h1", "a") and ping("h1", "b") and ping("h2", "a"),
               "hosts reach both switches' addresses, near and far")
-        la, lb = net.cli("a", "l2"), net.cli("b", "l2")
+        la, lb = l2("a"), l2("b")
         check(mac("h2") in la and mac("h1") in lb,
               "each l2 table has the far host's MAC: "
               + "; ".join(r.group(0).strip() for r in (re.search(re.escape(mac("h2")) + ".*", la),
                                                        re.search(re.escape(mac("h1")) + ".*", lb)) if r))
 
         for sw in "ab":
-            net.cli(sw, "vlan 20 1t 4t")
+            fw[sw].config("vlan 20 1t 4t")
         for h, ip in (("h1", "10.0.20.1/24"), ("h2", "10.0.20.2/24")):
             net.sh(h, "ip", "link", "add", "link", "eth0", "name", "eth0.20", "type", "vlan", "id", "20", check=True)
             net.sh(h, "ip", "addr", "add", ip, "dev", "eth0.20", check=True)
             net.sh(h, "ip", "link", "set", "eth0.20", "up", check=True)
         check(ping("h1", "10.0.20.2"), "VLAN 20 tagged on a.1, b.1 and the cable (a trunk): h1 reaches h2 on it")
 
-        net.cli("a", "vlan 30 1 4t")
-        net.cli("a", "pvid 1 30")
-        net.cli("b", "vlan 30 2 4t")
-        net.cli("b", "pvid 2 30")
+        fw["a"].config("vlan 30 1 4t", "pvid 1 30")
+        fw["b"].config("vlan 30 2 4t", "pvid 2 30")
         check(ping("h1", "h3") and not ping("h1", "h2") and not ping("h2", "h3"),
               "VLAN 30 untagged on a.1 and b.2, tagged on the cable: h1 reaches h3, not h2")
 

@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """test_igmp.py - rtlsim's IPv4 multicast under IGMP snooping matches silicon.
 
-    tests/net/test_igmp.py IMAGE [--board boards/X.json] [--rtlsim build/rtlsim]
-    tests/net/test_igmp.py IMAGE --oracle linux [--age S]
+    net/test_igmp.py IMAGE [--board boards/X.json] [--rtlsim build/rtlsim]
+    net/test_igmp.py IMAGE --oracle linux [--age S]
 
 Runs tests/net/hardware/mc_oracle.py's scenario - igmp on/off, an unregistered
 group, link-local, reports and leaves from two hosts, a stream after each -
@@ -22,40 +22,50 @@ the firmware's snooping is complete, so this is not in make test-net. Needs root
 itself with sudo); skipped without it.
 """
 import argparse, os, subprocess, sys, time
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "../lib"))
+import paths
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, "../fw"))
-sys.path.insert(0, os.path.join(HERE, "../../tools"))
+sys.path.insert(0, os.path.join(paths.OVS, "tools"))
 sys.path.insert(0, os.path.join(HERE, "hardware"))
 from console import PROMPT
 from rtlswitch import Lab
 from hwprobe import Switch
+import fwcli
 
 NICS = {"1": "igS", "2": "igM", "3": "igO", "4": "igR"}	# sender, member, other, router
 
 
 class ConsoleSwitch(Switch):
-	"""hwprobe's Switch over the simulator's serial console."""
+	"""hwprobe's Switch over the simulator's serial console. Its settings
+	(igmp on/off) go in the image's CLI (lib/fwcli.py); regget and regset
+	are the same on both firmwares."""
 	def __init__(self, console):
 		super().__init__("rtlsim")
 		self.c = console
+		self.fw = fwcli.FwCli(self.typed)
+
+	def typed(self, line):
+		for _ in range(5):	# and if one is still lost, the echo shows it: retry
+			start = len(self.c.log)
+			for ch in line + "\r":	# typed: a busy firmware drops a burst's characters
+				self.c.p.stdin.write(ch.encode())
+				self.c.p.stdin.flush()
+				time.sleep(0.005)
+			end = time.time() + 10
+			while time.time() < end and self.c.expect(b"> ", max(0.1, end - time.time())):
+				if fwcli.PROMPT.search(self.c.log[start:]):
+					break
+			got = self.c.log[start:].decode(errors="replace")
+			if "\n" + line + "\n" in "\n" + got:
+				return got
+		return got
 
 	def cmd(self, *lines):
-		out = []
-		for line in lines:
-			for _ in range(5):	# and if one is still lost, the echo shows it: retry
-				start = len(self.c.log)
-				for ch in line + "\r":	# typed: a busy firmware drops a burst's characters
-					self.c.p.stdin.write(ch.encode())
-					self.c.p.stdin.flush()
-					time.sleep(0.005)
-				self.c.expect(PROMPT, 10)
-				got = self.c.log[start:].decode(errors="replace")
-				if "\n" + line + "\n" in "\n" + got:
-					break
-			out.append(got)
+		out = "".join(self.fw.cmd(line) for line in lines)
 		if os.environ.get("IGMP_DEBUG"):
-			print("console:", repr("".join(out)), file=sys.stderr)
-		return "".join(out)
+			print("console:", repr(out), file=sys.stderr)
+		return out
 
 
 def sh(*cmd):
@@ -65,8 +75,8 @@ def sh(*cmd):
 def main():
 	ap = argparse.ArgumentParser()
 	ap.add_argument("image")
-	ap.add_argument("--board", default=os.path.join(HERE, "../../boards/swgt024_v2_0_unmanaged.json"))
-	ap.add_argument("--rtlsim", default=os.path.join(HERE, "../../build/rtlsim"))
+	ap.add_argument("--board", default=os.path.join(paths.OVS, "boards/swgt024_v2_0_unmanaged.json"))
+	ap.add_argument("--rtlsim", default=paths.RTLSIM)
 	ap.add_argument("--oracle", choices=["silicon", "linux"], default="silicon")
 	ap.add_argument("--age", type=int, default=32, help="--oracle linux: membership interval + 2, seconds")
 	a = ap.parse_args()
@@ -74,7 +84,8 @@ def main():
 		if subprocess.run(["sudo", "-n", "true"], capture_output=True).returncode:
 			print("igmp: no passwordless sudo, skipped")
 			return 0
-		return subprocess.run(["sudo", "-n", sys.executable, *sys.argv]).returncode
+		return subprocess.run(["sudo", "-n", "--preserve-env=RTLSIM_OVS,RTLSIM,RTLPG,RTLSIM_IMAGES",
+		                       sys.executable, *sys.argv]).returncode
 	import mc_oracle
 	nics = [NICS[f] for f in "1234"]
 	ref = None

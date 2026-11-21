@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """test_net.py - the firmware's TCP/IP stack against a real Linux one.
 
-    tests/net/test_net.py IMAGE [--rtlsim build/rtlsim] [--port 4] [--via tap|ovs]
+    net/test_net.py IMAGE [--rtlsim build/rtlsim] [--port 4] [--via tap|ovs]
 
 Linux, in a private network namespace, reaches a physical port of the switch
 (default 4, front port 1), pings the switch and loads its web UI. --via tap:
@@ -18,16 +18,20 @@ the time to load the web UI, and TCP throughput. A 10G SFP module
 (tools/mksfp.py) sits in slot 1, so the pages that read its EEPROM have one.
 """
 import argparse, json, os, re, shutil, statistics, subprocess, sys, tempfile, time
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "../lib"))
+import paths
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, "../fw"))
-from console import Console, PROMPT, switch_ip, peer_ip
-sys.path.insert(0, os.path.join(HERE, "../../tools"))
+from console import Console, PROMPT, DEFAULT_IP, peer_ip
+import fwcli, translate
+sys.path.insert(0, os.path.join(paths.OVS, "tools"))
 from rtlswitch import Lab
 
 CYCLES_PER_S = 125e6 / 4
 # Every JSON page app.js fetches
 PAGES = ["information", "ports", "counters", "traffic", "vlan", "vlanlist", "lag", "isolation", "mirror",
          "storm", "bandwidth", "eee", "lldp", "stp", "stpcnt"]
+QUERY = {"counters": "?port=1", "vlan": "?vid=1"}	# the page rows' (translate.py) forms
 failures = 0
 
 
@@ -86,7 +90,7 @@ def link_change(c, port, up, timeout):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("image")
-    ap.add_argument("--rtlsim", default=os.path.join(HERE, "../../build/rtlsim"))
+    ap.add_argument("--rtlsim", default=paths.RTLSIM)
     ap.add_argument("--port", type=int, default=4)
     ap.add_argument("--via", choices=["tap", "ovs"], default="tap")
     a = ap.parse_args()
@@ -97,13 +101,13 @@ def main():
     d = tempfile.mkdtemp(prefix="rtlsim-net-")
     os.chmod(d, 0o755)	# root's OVS reads and writes in here
     sock, ns, tap = os.path.join(d, "nic.sock"), f"rtlsim{os.getpid()}", "rtap0"
-    board = json.load(open(os.path.join(HERE, "../../boards/swgt024_v2_0_unmanaged.json")))
+    board = json.load(open(os.path.join(paths.OVS, "boards/swgt024_v2_0_unmanaged.json")))
     fronts = [p["front"] for p in board["ports"] if "sfp" not in p]
     front = next(p["front"] for p in board["ports"] if p["phys"] == a.port)
     other = next(f for f in fronts if f != front)
     err = open(os.path.join(d, "rtlsim.err"), "w+")
     sfp = os.path.join(d, "sfp.bin")
-    subprocess.run([sys.executable, os.path.join(HERE, "../../tools/mksfp.py"), sfp], check=True)
+    subprocess.run([sys.executable, os.path.join(paths.OVS, "tools/mksfp.py"), sfp], check=True)
     extra = ["--trace-nic", "--sfp", f"1={sfp}", "--link", "8=10g"]
     bridge = lab = None
     if a.via == "tap":
@@ -115,7 +119,8 @@ def main():
         c = lab.console
     try:
         check(c.expect(PROMPT, 30), "boots to the prompt")
-        ip = switch_ip(c)
+        fw = fwcli.FwCli(fwcli.console_sender(c))
+        ip = fw.read("ip").get("state.mgmt.ip") or DEFAULT_IP
         host = peer_ip(ip)
         if a.via == "tap":
             print(f"switch {ip}, Linux {host} in netns {ns}, via a tap")
@@ -163,18 +168,32 @@ def main():
 
         bad, seen = [], ""
         for page in PAGES:
-            r = sudo(*nsx, "curl", "-s", "--max-time", "10", "-b", jar, "-w", r"\n%{http_code}",
-                     f"http://{ip}/{page}.json", timeout=30)
-            body, _, code = r.stdout.rpartition("\n")
-            try:
-                json.loads(body)
-                ok = code == "200"
-            except ValueError:
-                ok = False
+            if fw.om:	# the UI asks POST /cli: each page's get lines (oldnew/translate.py)
+                path = f"/{page}.json" + QUERY.get(page, "")
+                m, what = translate.find_page(path, fw.canon)
+                lines = "\n".join(what.gets(m, fw.r, what.objs & fw.canon)) + "\n"
+                r = sudo(*nsx, "curl", "-s", "--max-time", "10", "-b", jar, "-w", r"\n%{http_code}",
+                         "--data-binary", lines, f"http://{ip}/cli", timeout=30)
+                body, _, code = r.stdout.rpartition("\n")
+                status = re.findall(r"^(ok|err .*)$", body, re.M)
+                ok = code == "200" and len(status) == lines.count("\n") and all(x == "ok" for x in status)
+            else:
+                r = sudo(*nsx, "curl", "-s", "--max-time", "10", "-b", jar, "-w", r"\n%{http_code}",
+                         f"http://{ip}/{page}.json", timeout=30)
+                body, _, code = r.stdout.rpartition("\n")
+                try:
+                    json.loads(body)
+                    ok = code == "200"
+                except ValueError:
+                    ok = False
             if not ok:
                 bad.append(f"{page} ({code}: {body[:60]!r})")
             seen += body
-        check(not bad, f"all {len(PAGES)} JSON pages answer with JSON" + (f"; not: {', '.join(bad)}" if bad else ""))
+        if fw.om:	# the UI's port tab: state.sfp
+            seen += sudo(*nsx, "curl", "-s", "--max-time", "10", "-b", jar, "--data-binary", "get state.sfp\n",
+                         f"http://{ip}/cli", timeout=30).stdout
+        what = "answer POST /cli with ok" if fw.om else "answer with JSON"
+        check(not bad, f"all {len(PAGES)} of the UI's reads {what}" + (f"; not: {', '.join(bad)}" if bad else ""))
         check("RTLSIM" in seen, "the SFP module's vendor shows in the web UI's data")
 
         r = sudo(*curl, "-o", "/dev/null", f"http://{ip}/app.js", timeout=90)
