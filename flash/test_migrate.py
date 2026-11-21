@@ -24,6 +24,10 @@ upload leaves it; then it's powered on until it's up:
   (the RTL8238B stub) gets image 0 from it;
 - a non-config sector at 0x70000 (staging leftovers) isn't taken for a
   config: nothing moves, and the switch comes up on its default config.
+On an object-model bridge (main: it has no text config code, the host
+converts an old config, RTLPlayground 9eb1513) the old config isn't moved:
+0x70000 stays as it was, 0x7F000 isn't the old text, nothing says it moved,
+and the rest is the same.
 --sweep also cuts the power before every erase and every 512-byte block of
 both migrations (tests/flash/flashlab.py) and counts up / dead / bad; bad
 (up, but not in the state above) fails the test. Per-cut results go to
@@ -64,6 +68,12 @@ def mdata_len(d, a):
     return int.from_bytes(d[a + 4:a + 8], "little") + 10
 
 
+def moves_config(br):
+    """Whether the bridge's firmware moves a standard layout's saved config
+    (compact-layout, feat/sched); an object-model one doesn't."""
+    return b"Moving the saved config" in br
+
+
 def scenario(a, d, machine, base, bridge, staged_path):
     chip = bytearray(open(base, "rb").read())
     br = open(bridge, "rb").read()
@@ -78,8 +88,12 @@ def scenario(a, d, machine, base, bridge, staged_path):
     # the first compact boot moves out and erases the header of)
     upto = MDATA_XFER if md else COPY
     s.expect("image", lambda f: f[:upto] == br[:upto])
-    s.expect("config at 0x7F000", lambda f: f[CONFIG:CONFIG + 0x1000] == old[LEGACY:LEGACY + 0x1000])
-    s.expect("0x70000 erased", lambda f: erased(f, LEGACY, 0x1000))
+    if moves_config(br):
+        s.expect("config at 0x7F000", lambda f: f[CONFIG:CONFIG + 0x1000] == old[LEGACY:LEGACY + 0x1000])
+        s.expect("0x70000 erased", lambda f: erased(f, LEGACY, 0x1000))
+    else:
+        s.expect("0x7F000 not the old text", lambda f: f[CONFIG:CONFIG + 0x1000] != old[LEGACY:LEGACY + 0x1000])
+        s.expect("0x70000 as it was", lambda f: f[LEGACY:LEGACY + 0x1000] == old[LEGACY:LEGACY + 0x1000])
     s.expect("upload area erased", lambda f: erased(f, UPLOAD + (MDATA_LEN if md else 0), 0x80000 - (MDATA_LEN if md else 0)))
     if old[MAC:MAC + 6] != b"\xff" * 6:
         s.expect("factory MAC kept", lambda f: f[MAC:MAC + 6] == old[MAC:MAC + 6])
@@ -127,7 +141,10 @@ def main():
             verdict = s.verdict(f, console) if state == "up" else "dead"
             check(verdict == "up", f"{machine}: the bridge installs and the switch comes up migrated "
                   f"({n} power-ons){'' if verdict == 'up' else '; ' + verdict}")
-            check(console.count("Moving the saved config to its new place... done") == 1, f"{machine}: the config moved once")
+            if moves_config(br):
+                check(console.count("Moving the saved config to its new place... done") == 1, f"{machine}: the config moved once")
+            else:
+                check("Moving the saved config" not in console, f"{machine}: the old config isn't moved (the host converts it)")
             if md:
                 check(console.count("Moving the machine data to its own region... done") == 1,
                       f"{machine}: the machine data moved once ({md} bytes)")

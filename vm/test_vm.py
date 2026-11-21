@@ -9,13 +9,16 @@ twice on a copy of the data disk, with -fw_cfg putting a 10G module in SFP
 cage 1. Checks the console answers, the module is found, the switch answers
 ARP on front port 1 and floods a broadcast to port 2, a unicast to a MAC
 learned on port 2 is switched there, and the second boot finds the flash the
-first one left (its saved config: no "Written default config"). Uses KVM if
+first one left: on main a hostname saved on the first boot, on compact-layout
+and feat/sched the default config the first boot wrote (no second "Written
+default config"). Settings and reads go by lib/fwcli.py. Uses KVM if
 it can.
 """
 import argparse, os, shutil, socket, struct, subprocess, sys, tempfile, time
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, "../lib"))
 import paths
+import fwcli
 sys.path.insert(0, os.path.join(HERE, "../net"))
 from test_nic import Peer, eth, ip_bytes, PEER_MAC, PEER_IP, SWITCH_IP, SWITCH_MAC
 from console import DEFAULT_IP, peer_ip
@@ -110,13 +113,17 @@ def main():
             print(open(os.path.join(d, "linux.log"), errors="replace").read()[-1500:])
             return 1
         first = vm.log
-        vm.expect(b"Module: RTLSIM", 30)
-        out = vm.cli("sfp")
-        check("Slot 1 - Rate: 67" in out and "Slot 2 - empty" in out, "-fw_cfg SFP1=10g: a 10G module in cage 1")
+        fw = fwcli.FwCli(vm.cli)
+        t, sfp = time.time(), {}
+        while time.time() - t < 30 and sfp.get("state.sfp.1.ready") != "on":	# the module's EEPROM read
+            time.sleep(1)
+            sfp = fw.read("sfp")
+        check(sfp.get("state.sfp.1.present") == "on" and sfp.get("state.sfp.1.rate_mbps") == "10300"
+              and sfp.get("state.sfp.2.present") == "off",
+              f"-fw_cfg SFP1=10g: a 10G module in cage 1 ({ {k: v for k, v in sfp.items() if 'ddm' not in k} })")
 
         global SWITCH_IP, PEER_IP
-        m = re.search(r"Current IP: ([\d.]+)", vm.cli("ip"))
-        sip = m.group(1) if m else DEFAULT_IP
+        sip = fw.read("ip").get("state.mgmt.ip") or DEFAULT_IP
         SWITCH_IP, PEER_IP = ip_bytes(sip), ip_bytes(peer_ip(sip))
         print(f"switch IP {sip}, peer {peer_ip(sip)}")
 
@@ -137,13 +144,23 @@ def main():
         p1.send(eth(mac2, 0x88b5, b"from port 1" * 4))
         check(p2.reply(0x88b5, lambda f: b"from port 1" in f, timeout=3) is not None,
               "a unicast from port 1 to a MAC learned on port 2 is switched there")
+        if fw.om:	# the object model writes nothing until a save
+            fw.config("hostname vm-test")
+            saved = "\nok" in vm.cli("save")
+            time.sleep(1)	# rtlsim writes flash.bin back within 50 ms (tools/vm/README.md)
         vm.close()
 
         vm = VM(a.image, data, d)
         up = vm.expect(PROMPT, 90)
-        why = [w for w, bad in (("first boot wrote the default config", b"Written default config to flash" not in first),
-                                ("second boot found it", b"Written default config" in vm.log),
-                                ("second boot's prompt", not up)) if bad]
+        if fw.om:
+            name = fwcli.FwCli(vm.cli, om=True).read("hostname").get("sys.hostname") if up else None
+            why = [w for w, bad in (("first boot saved a hostname", not saved),
+                                    (f"second boot has it ({name!r})", name != "vm-test"),
+                                    ("second boot's prompt", not up)) if bad]
+        else:
+            why = [w for w, bad in (("first boot wrote the default config", b"Written default config to flash" not in first),
+                                    ("second boot found it", b"Written default config" in vm.log),
+                                    ("second boot's prompt", not up)) if bad]
         check(not why, "a second boot finds the flash the first left on the data disk" + (f"; not: {why}" if why else ""))
         if not up:
             print("  firmware console:", vm.log.decode(errors="replace")[-300:])

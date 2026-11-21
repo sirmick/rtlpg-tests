@@ -13,10 +13,13 @@
 #             install's resets, the NIC ring, LACP          (no privilege)
 #   net       Linux in a netns: tap, OVS, switching, two switches, IGMP
 #                                                           (sudo + openvswitch)
+#   update    a web update on a persistent flash, its config kept, a power
+#             cut in the copy                               (sudo)
 #   powercut  a power cut at every step of a web install
 #   flash     PoE, standard->compact, the loader, a web update through the
 #             loader. Needs an image matrix in $RTLSIM_IMAGES (make
 #             rtlsim-images); skipped, not failed, without one.
+#   vm        the switch VM (ovs-rtlpg tools/vm) booting the image under QEMU
 #
 # These are functional tests, not silicon-timing-faithful: rtlsim's flash and
 # clock are not the chip's, so a pass is not a green light to flash hardware.
@@ -26,7 +29,7 @@ HERE=$(cd "$(dirname "$0")/.." && pwd)
 RTLPG=$(cd "${1:?usage: run.sh RTLPG_DIR OVS_DIR [TIER ...]}" && pwd)
 OVS=$(cd "${2:?usage: run.sh RTLPG_DIR OVS_DIR [TIER ...]}" && pwd)
 shift 2
-TIERS=("$@"); [ ${#TIERS[@]} -eq 0 ] && TIERS=(sim core net powercut flash)
+TIERS=("$@"); [ ${#TIERS[@]} -eq 0 ] && TIERS=(sim core net update powercut flash vm)
 export RTLPG RTLSIM_OVS=$OVS RTLSIM=$OVS/build/rtlsim
 M="make -C $HERE RTLPG=$RTLPG RTLSIM_OVS=$OVS"
 rc=0
@@ -47,6 +50,8 @@ for t in "${TIERS[@]}"; do
 	sim)      run "the simulator's own tests" make -C "$OVS" RTLPG="$RTLPG" test ;;
 	core)     run "core (boot, NIC, flows, resets, NIC ring, LACP)" $M core ;;
 	net)      run "network (tap, OVS, switching, topology, IGMP)" $M net ;;
+	update)   run "a web update on a persistent flash" $M update ;;
+	vm)       run "the switch VM under QEMU" $M vm ;;
 	powercut) run "power cut during a web install" $M powercut ;;
 	flash)
 		images=${RTLSIM_IMAGES:-$HOME/rtlsim/images}

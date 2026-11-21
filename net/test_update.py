@@ -8,7 +8,9 @@ namespace (a tap on the --nic socket, as test_net.py) logs in and uploads
 images as RTLPlayground's tools/fwupdate.py does (a multipart POST to
 /upload). Checks:
 - a good image is staged, verified at the next boot, copied into place, and
-  the switch comes back with its saved config. Its upload runs across
+  the switch comes back with its saved config (a hostname, saved from the web
+  as the UI saves: the config file by POST /config on compact-layout and
+  feat/sched, set/apply/save by POST /cli on main). Its upload runs across
   loader_confirm(), 15 s (LDR_CONFIRM_S) after the boot, which reads the
   loader's boot counter: before RTLPlayground 56db072 it read it into
   flash_buf, where the upload keeps its next page between packets, and the
@@ -28,9 +30,11 @@ import paths
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, "../fw"))
 from console import Console, PROMPT
+import fwcli
 
 failures = 0
-IP = "192.168.2.2"
+IP = "192.168.10.247"	# config.txt's, on every branch
+HOSTNAME = "update-test"
 CONFIRM_S = 15		# LDR_CONFIRM_S
 
 
@@ -78,6 +82,17 @@ class Switch:
                       f"http://{IP}/upload")
         return r.stdout.strip()
 
+    def save(self, om):
+        """A hostname saved as the UI saves the config."""
+        if om:
+            r = self.curl("--data-binary", f"set sys.hostname {HOSTNAME}\napply\nsave\n", f"http://{IP}/cli")
+            return r.stdout.count("ok") == 3
+        cfg = os.path.join(self.d, "config.txt")
+        with open(cfg, "w") as f:
+            f.write(f"ip {IP}\ngw 192.168.10.1\nnetmask 255.255.255.0\nhostname {HOSTNAME}\n")
+        r = self.curl("-F", f"configuration=@{cfg};filename=config.txt", f"http://{IP}/config")
+        return r.returncode == 0
+
     def wait_boots(self, n, timeout):
         """Waits for the n-th boot to reach its prompt; notes when it began."""
         end = time.time() + timeout
@@ -112,7 +127,7 @@ def main():
     ns = f"rtlsimu{os.getpid()}"
     nsx = ["ip", "netns", "exec", ns]
     for cmd in (["ip", "netns", "add", ns], [*nsx, "ip", "tuntap", "add", "dev", "rtap0", "mode", "tap"],
-                [*nsx, "ip", "addr", "add", "192.168.2.1/24", "dev", "rtap0"], [*nsx, "ip", "link", "set", "rtap0", "up"]):
+                [*nsx, "ip", "addr", "add", "192.168.10.1/24", "dev", "rtap0"], [*nsx, "ip", "link", "set", "rtap0", "up"]):
         sudo(*cmd)
     bad = os.path.join(d, "bad.bin")
     open(bad, "wb").write(img[:0x5000] + bytes([img[0x5000] ^ 0xff]) + img[0x5001:])
@@ -120,10 +135,13 @@ def main():
     try:
         sw = Switch(a, d, ns)
         sw.connect()		# the firmware's clock runs with ours from here
-        check(sw.c.expect(PROMPT, 30) and b"Written default config to flash" in sw.c.log,
-              "first boot on an empty flash writes the default config")
+        up = sw.c.expect(PROMPT, 30)
+        fw = fwcli.FwCli(fwcli.console_sender(sw.c))
+        check(up and fw.read("ip").get("state.mgmt.ip") == IP,
+              f"first boot on an empty flash comes up on the default config ({IP})")
 
         sw.login()
+        check(sw.save(fw.om), f"a hostname ({HOSTNAME}) saved from the web")
         t0 = sw.uptime()
         verdict = sw.upload(a.image, "--limit-rate", "20k")	# ~12 s, across loader_confirm()
         t1 = sw.uptime()
@@ -133,8 +151,12 @@ def main():
         why = [w for w, bad in (("3 boots", boots(log) != 3),
                                 ("upload across 15 s", not t0 < CONFIRM_S - 1 < CONFIRM_S + 1 < t1),
                                 ("verified", not re.search(r"found update image!\nChecking integrity\.*Checksum OK", log)),
-                                ("staging cleared", "no update image found" not in third),
-                                ("config kept", "Written default config" in third)) if bad]
+                                ("staging cleared", "no update image found" not in third)) if bad]
+        if up:
+            fw = fwcli.FwCli(fwcli.console_sender(sw.c))
+            kept = fw.read("hostname").get("sys.hostname")
+            if kept != HOSTNAME:
+                why.append(f"config kept (hostname {kept!r})")
         check(up and not why, f"a good image, uploaded from {t0:.0f} to {t1:.0f} s after the boot "
               f"({verdict[:30]!r}), is staged, verified, copied, and the switch comes back with its config"
               + (f"; not: {why}" if why else ""))
@@ -170,8 +192,8 @@ def main():
             check(cut and "Done." not in done and "Resuming the update" in log and up
                   and log.rstrip().endswith(">"),
                   "a power cut in the middle of the copy: the next power-on resumes it and the switch comes up")
-            sw.c.send("ip")
-            check(sw.c.expect(b"Current IP", 10), "and its CLI answers")
+            check(up and fwcli.FwCli(fwcli.console_sender(sw.c)).read("ip").get("state.mgmt.ip") == IP,
+                  "and its CLI answers")
     finally:
         if sw:
             sw.close()
