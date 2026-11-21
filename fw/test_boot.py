@@ -181,7 +181,14 @@ def main():
                   "state.sfp has its identity and diagnostics (rate 0x67, options 0x68, Vcc 0x80e8), its port up at 10G; "
                   "slot 2 empty")
         else:
-            ok, out = run(c, "sfp")
+            # after the insertion's last step, the SerDes set for the module: on feat/sched
+            # an sfp typed while its SFP task still reads the module gets "I2C read failed"
+            c.expect(b"RTL837X_REG_SDS_MODES", 30)
+            c.expect(PROMPT, 5)
+            start = len(c.log)
+            c.send("sfp")	# its reply ends with slot 2; a scheduler's SFP task may print and prompt first
+            ok = c.expect(b"Slot 2 - ", 60) and c.expect(PROMPT, 10)
+            out = c.log[start:].decode(errors="replace")
             check(ok and "Slot 1 - Rate: 67" in out and "Options: 68" in out and "Vcc: 80e8" in out
                   and "Slot 2 - empty" in out, "the sfp command reads its identity and diagnostics")
         c.close()

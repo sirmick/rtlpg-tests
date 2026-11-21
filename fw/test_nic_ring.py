@@ -105,6 +105,7 @@ def main():
     a = ap.parse_args()
 
     f = session(a)
+    sched = b"RX_STEP" in open(a.image, "rb").read()	# feat/sched and main: a cooperative scheduler, not the main loop
     need = 1 + -(-(1514 + 12) // SLOT)		# descriptor + the frame with its tags, in slots
     fit = 10240 // SLOT // need
     check(f["burst"] == fit and f["burst_drops"] == 20 - fit,
@@ -113,8 +114,8 @@ def main():
     check(f["drained"].startswith("0/"), f"the firmware drains the ring once it runs (ring {f['drained']})")
     check(f["idle"] == 50 and f["idle_drops"] == 0, f"50 small frames 200 µs apart while idle: {f['idle']} taken, {f['idle_drops']} dropped")
     busy = "get state" if f["om"] else "stat"
-    if f["om"]:
-        check(f["busy"] == 300 and f["busy_drops"] == 0, f"300 small frames 100 µs apart while `get state` streams: "
+    if f["om"] or sched:
+        check(f["busy"] == 300 and f["busy_drops"] == 0, f"300 small frames 100 µs apart while `{busy}` streams: "
               f"{f['busy']} taken, {f['busy_drops']} dropped (the scheduler drains the ring between its steps)")
     else:
         check(f["busy_drops"] > 0, f"300 small frames 100 µs apart while `stat` prints: {f['busy']} taken, {f['busy_drops']} dropped as ring_full")
