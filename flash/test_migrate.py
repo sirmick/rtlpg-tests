@@ -2,7 +2,7 @@
 """test_migrate.py - standard -> compact on 2 and 4 MiB boards: the bridge
 install, then the config and machine data moves, once each.
 
-    tests/flash/test_migrate.py [--images DIR] [--rtlsim build/rtlsim]
+    flash/test_migrate.py [--images DIR] [--rtlsim build/rtlsim]
                                 [--sweep] [--jobs N] [--results DIR]
 
 DIR is an image matrix (RTLPlayground's build for rtlsim, manifest.json;
@@ -30,6 +30,8 @@ both migrations (tests/flash/flashlab.py) and counts up / dead / bad; bad
 --results (one file per board).
 """
 import argparse, glob, json, os, shutil, sys, tempfile, time
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "../lib"))
+import paths
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import flashlab
@@ -68,7 +70,7 @@ def scenario(a, d, machine, base, bridge, staged_path):
     chip[UPLOAD:UPLOAD + len(br)] = br
     chip[UPLOAD + len(br)] = 0		# the web upload ends the data with a 0
     open(staged_path, "wb").write(chip)
-    s = flashlab.Scenario(a.rtlsim, bridge, staged_path, os.path.join(HERE, "../../boards", BOARDS[machine]))
+    s = flashlab.Scenario(a.rtlsim, bridge, staged_path, os.path.join(paths.OVS, "boards", BOARDS[machine]))
     old = bytes(chip)
     md = mdata_len(br, MDATA_XFER)
     mac = ":".join(f"{b:02x}" for b in old[MAC:MAC + 6])
@@ -93,7 +95,7 @@ def scenario(a, d, machine, base, bridge, staged_path):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--images")
-    ap.add_argument("--rtlsim", default=os.path.join(HERE, "../../build/rtlsim"))
+    ap.add_argument("--rtlsim", default=paths.RTLSIM)
     ap.add_argument("--sweep", action="store_true")
     ap.add_argument("--jobs", type=int, default=max(1, (os.cpu_count() or 2) // 2))
     ap.add_argument("--results", default=os.path.expanduser("~/rtlsim/results"))
@@ -113,7 +115,7 @@ def main():
             if not (os.path.exists(base) and os.path.exists(bridge)):
                 print(f"{machine}: no old chip or bridge, skipped")
                 continue
-            fl = json.load(open(os.path.join(HERE, "../../boards", BOARDS[machine])))["flash"]["size"]
+            fl = json.load(open(os.path.join(paths.OVS, "boards", BOARDS[machine])))["flash"]["size"]
             if not check(SIZES.get(fl) == os.path.getsize(base),
                          f"{machine}: the board's flash ({fl}) is the size of the old chip ({os.path.getsize(base):#x})"):
                 continue

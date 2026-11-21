@@ -2,7 +2,7 @@
 """checks.py - the new-only acceptance checks (rtlpg-sched doc/sched/testing.md,
 "New-only acceptance checks") on one image, without an old one to compare to:
 
-    tests/oldnew/checks.py --image IMAGE [--board FILE] [--only NAME...]
+    oldnew/checks.py --image IMAGE [--board FILE] [--only NAME...]
                            [--known FILE] [--payload FILE] [-j N] [--rtlsim build/rtlsim]
 
 It runs the scenarios (scenarios.py; by default those with a check) in
@@ -23,6 +23,8 @@ PASS, FAIL, KNOWN (a failure --known lists, within its ceiling:
 oldnew.load_known()), SKIP. Exit 0 when no check FAILs.
 """
 import argparse, os, sys, time
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "../lib"))
+import paths
 from concurrent.futures import ProcessPoolExecutor
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -42,7 +44,7 @@ def main():
     ap.add_argument("--payload", help="what the upload scenarios upload (default: the image's own application)")
     ap.add_argument("--om", default="", metavar="OBJS", help="the objects the image has on the object model (oldnew --new-om)")
     ap.add_argument("-j", type=int, default=os.cpu_count())
-    ap.add_argument("--rtlsim", default=os.path.join(HERE, "../../build/rtlsim"))
+    ap.add_argument("--rtlsim", default=paths.RTLSIM)
     a = ap.parse_args()
     names = a.only or CHECKED
     for n in names:

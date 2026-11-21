@@ -3,7 +3,7 @@
 scenarios (oldnew.py --cov DIR): which the old build ran that the new one
 doesn't, and the other way round.
 
-    tests/oldnew/cov_diff.py DIR --old-map OLD.map --new-map NEW.map [--region loaded]
+    oldnew/cov_diff.py DIR --old-map OLD.map --new-map NEW.map [--region loaded]
 
 Each side's dumps (<scenario>.old.cov, <scenario>.new.cov) are mapped
 through its own map (tools/cov_report.py's Coverage, region "loaded": the
@@ -12,9 +12,11 @@ any scenario. Two builds' functions are compared by name only: a function
 renamed or split is listed on both sides.
 """
 import argparse, glob, os, sys
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "../lib"))
+import paths
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, os.path.join(HERE, "..", "..", "tools"))
+sys.path.insert(0, os.path.join(paths.OVS, "tools"))
 from cov_report import Coverage
 
 

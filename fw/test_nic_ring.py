@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """test_nic_ring.py - the NIC RX ring's capacity, and the drops when it fills.
 
-    tests/fw/test_nic_ring.py IMAGE [--board FILE] [--rtlsim build/rtlsim]
+    fw/test_nic_ring.py IMAGE [--board FILE] [--rtlsim build/rtlsim]
 
 rtlsim --control gives the ring the silicon's 10 KiB (--nic-rx-ring,
 sys/nic.h): a frame takes its 8-byte descriptor and the frame with the CPU and
@@ -23,8 +23,10 @@ nic-rx-full.
 - Each run twice: the same counts.
 """
 import argparse, json, os, re, sys
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "../lib"))
+import paths
 HERE = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, os.path.join(HERE, ".."))
+sys.path.insert(0, os.path.join(paths.OVS, "tests"))
 from rtlsim_ctl import Sim
 
 PROMPT = r"\n(\[confirm [0-9]+\] )?\*?> "	# with P3A's markers; a POSIX ERE too
@@ -60,7 +62,7 @@ def stream(sim, port, count, gap_ms):
 
 def session(a, ring=None):
     args = ["--quiet"] + (["--nic-rx-ring", str(ring)] if ring else [])
-    board = a.board or os.path.join(HERE, "../../boards/swgt024_v2_0_unmanaged.json")	# rtlsim's default
+    board = a.board or os.path.join(paths.OVS, "boards/swgt024_v2_0_unmanaged.json")	# rtlsim's default
     port = json.load(open(board))["ports"][0]["phys"]	# front port 1
     with Sim(a.image, board=a.board, rtlsim=a.rtlsim, args=args) as sim:
         sim.link(port, True)
@@ -99,7 +101,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("image")
     ap.add_argument("--board")
-    ap.add_argument("--rtlsim", default="build/rtlsim")
+    ap.add_argument("--rtlsim", default=paths.RTLSIM)
     a = ap.parse_args()
 
     f = session(a)

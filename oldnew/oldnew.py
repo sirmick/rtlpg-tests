@@ -3,7 +3,7 @@
 layer 4): the same scenarios on two firmware images, in rtlsim --control,
 with the same inputs at the same firmware times, compared on results.
 
-    tests/oldnew/oldnew.py --old IMAGE --new IMAGE [--board FILE] [--only NAME...]
+    oldnew/oldnew.py --old IMAGE --new IMAGE [--board FILE] [--only NAME...]
                            [--expect FILE] [--payload FILE] [--save DIR] [-j N]
                            [--rtlsim build/rtlsim]
 
@@ -46,6 +46,8 @@ each scenario, not compared; --checks makes NEW's failures fail the run,
 --known FILE lists today's (as --expect's format: <scenario glob> <check glob>).
 """
 import argparse, difflib, fnmatch, glob, hashlib, json, os, re, struct, sys, time
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "../lib"))
+import paths
 from concurrent.futures import ProcessPoolExecutor
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -56,7 +58,7 @@ from scenarios import SCENARIOS
 import translate
 
 CONFIG_START, CONFIG_LEN = 0x7f000, 0x1000	# layout.h, compact
-DEFAULT_BOARD = os.path.join(HERE, "../../boards/swgt024_v2_0_unmanaged.json")	# rtlsim's own default
+DEFAULT_BOARD = os.path.join(paths.OVS, "boards/swgt024_v2_0_unmanaged.json")	# rtlsim's own default
 # The register window the loader writes the application's common code
 # through (0x80b0 + 4 i, sys/system.cpp model_code_ram_load()): the program,
 # not the switch's state, so not a result.
@@ -961,7 +963,7 @@ def main():
     ap.add_argument("--save")
     ap.add_argument("--cov", metavar="DIR", help="each run's coverage, <scenario>.<side>.cov (tests/oldnew/cov_diff.py)")
     ap.add_argument("-j", type=int, default=os.cpu_count())
-    ap.add_argument("--rtlsim", default=os.path.join(HERE, "../../build/rtlsim"))
+    ap.add_argument("--rtlsim", default=paths.RTLSIM)
     a = ap.parse_args()
     names = a.only or list(SCENARIOS)
     for n in names:

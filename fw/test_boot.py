@@ -2,7 +2,7 @@
 """test_boot.py - boot a real firmware image on rtlsim and check it against
 silicon.
 
-    tests/fw/test_boot.py IMAGE [--board FILE] [--rtlsim build/rtlsim]
+    fw/test_boot.py IMAGE [--board FILE] [--rtlsim build/rtlsim]
 
 - Every line of the silicon boot log (golden/swtg024as-boot.log, the bench
   SWTG024AS; version, build date and toolchain left out: they are the
@@ -32,11 +32,13 @@ writes no default config: a blank one stays blank until a save).
 the silicon log and port table are the SWTG024AS's, checked on it alone.
 """
 import argparse, json, os, re, subprocess, sys, tempfile, time
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "../lib"))
+import paths
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from console import Console, PROMPT
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-DEFAULT_BOARD = os.path.join(HERE, "../../boards/swgt024_v2_0_unmanaged.json")	# rtlsim's
+DEFAULT_BOARD = os.path.join(paths.OVS, "boards/swgt024_v2_0_unmanaged.json")	# rtlsim's
 OM_QUIET = re.compile(r"(EEE (on for|can't be enabled)|igmp_setup called)")	# the old boot's debug lines
 failures = 0
 
@@ -82,7 +84,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("image")
     ap.add_argument("--board")
-    ap.add_argument("--rtlsim", default=os.path.join(HERE, "../../build/rtlsim"))
+    ap.add_argument("--rtlsim", default=paths.RTLSIM)
     a = ap.parse_args()
     bd = json.load(open(a.board or DEFAULT_BOARD))
     bargs = ["--board", a.board] if a.board else []
@@ -156,7 +158,7 @@ def main():
 
     with tempfile.TemporaryDirectory() as d:
         sfp = os.path.join(d, "sfp.bin")
-        subprocess.run([sys.executable, os.path.join(HERE, "../../tools/mksfp.py"), sfp, "--vendor", "ACME"], check=True)
+        subprocess.run([sys.executable, os.path.join(paths.OVS, "tools/mksfp.py"), sfp, "--vendor", "ACME"], check=True)
         c = Console(a.rtlsim, a.image, bargs + ["--sfp", f"1={sfp}", "--link", f"{cages[0]['phys']}=10g"])
         # the main loop's SFP poll finds it after the prompt
         up = c.expect(PROMPT, 120) and c.expect(b"Module: ACME", 30)
@@ -185,7 +187,7 @@ def main():
         c.close()
 
     with tempfile.TemporaryDirectory() as d:
-        subprocess.run([sys.executable, os.path.join(HERE, "../../tools/mksfp.py"), os.path.join(d, "m.bin"),
+        subprocess.run([sys.executable, os.path.join(paths.OVS, "tools/mksfp.py"), os.path.join(d, "m.bin"),
                         "--vendor", "BOARDFILE"], check=True)
         b = json.load(open(a.board or DEFAULT_BOARD))
         b["uuid"] = "0x12345600"

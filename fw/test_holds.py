@@ -2,7 +2,7 @@
 """test_holds.py - control mode's knobs that force a poll's timeout
 (src/ctl/control.h): reg hold, phy hold, flash wp.
 
-    tests/fw/test_holds.py BOOT_IMAGE [--board FILE] [--rtlsim build/rtlsim]
+    fw/test_holds.py BOOT_IMAGE [--board FILE] [--rtlsim build/rtlsim]
 
 On a boot image of fork main (or any with regget/phyget and the web config
 save), through the firmware's own reads:
@@ -23,6 +23,8 @@ save), through the firmware's own reads:
   sys.hostname and save by POST /cli (oldnew's post_config).
 """
 import argparse, os, sys
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "../lib"))
+import paths
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, "..", "oldnew"))
@@ -50,7 +52,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("image")
     ap.add_argument("--board")
-    ap.add_argument("--rtlsim", default=os.path.join(HERE, "../../build/rtlsim"))
+    ap.add_argument("--rtlsim", default=paths.RTLSIM)
     a = ap.parse_args()
     r = Run(a.image, a.board, a.rtlsim, None)
     sim = r.b.sim

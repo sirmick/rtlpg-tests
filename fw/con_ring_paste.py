@@ -10,6 +10,8 @@ A measure, not a pass/fail test: the ring holds 256 B, ~22 ms at 115200, so a
 step longer than that under a continuous paste loses what doesn't fit (a
 ~40 ms one ~200 B). Decision 25 allows steps up to 50 ms."""
 import argparse, os, re, sys
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "../lib"))
+import paths
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, "..", "oldnew"))
 from oldnew import Run
@@ -17,7 +19,7 @@ from oldnew import Run
 ap = argparse.ArgumentParser()
 ap.add_argument("image")
 ap.add_argument("board", nargs="?")
-ap.add_argument("--rtlsim", default=os.path.join(HERE, "../../build/rtlsim"))
+ap.add_argument("--rtlsim", default=paths.RTLSIM)
 args = ap.parse_args()
 img, board = args.image, args.board
 CHAR_US = 87		# 10 bits at 115200

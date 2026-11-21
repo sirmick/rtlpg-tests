@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """test_loop.py - loop detection (RLDP): a cable from a switch to itself.
 
-    tests/net/test_loop.py IMAGE [--rtlsim build/rtlsim]
+    net/test_loop.py IMAGE [--rtlsim build/rtlsim]
 
 IMAGE must have the "loop" command (RTLPlayground feat/loop-detect). One
 switch, host h1 on front 1, a cable between fronts 3 and 4 that starts
@@ -16,8 +16,10 @@ higher port. Checks:
 Needs sudo; skipped without it.
 """
 import argparse, json, os, re, subprocess, sys, time
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "../lib"))
+import paths
 HERE = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, os.path.join(HERE, "../../tools"))
+sys.path.insert(0, os.path.join(paths.OVS, "tools"))
 from rtlswitch import Net
 
 failures = 0
@@ -66,7 +68,7 @@ def wait_for(net, pattern, timeout):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("image")
-    ap.add_argument("--rtlsim", default=os.path.join(HERE, "../../build/rtlsim"))
+    ap.add_argument("--rtlsim", default=paths.RTLSIM)
     a = ap.parse_args()
     if subprocess.run(["sudo", "-n", "true"], capture_output=True).returncode:
         print("loop: no passwordless sudo, skipped")

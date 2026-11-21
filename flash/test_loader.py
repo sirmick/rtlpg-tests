@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """test_loader.py - RTLPlayground's loader starts its application.
 
-    tests/flash/test_loader.py [CHIP] [--rtlsim build/rtlsim]
+    flash/test_loader.py [CHIP] [--rtlsim build/rtlsim]
 
 CHIP is a loader + application image for a programmer (*-compact-boot.bin;
 default: the newest in $RTLSIM_IMAGES, ~/rtlsim/images/*/;
@@ -12,6 +12,8 @@ show the loader's banner, "Starting application", and the application at its
 prompt.
 """
 import argparse, glob, os, subprocess, sys, re
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "../lib"))
+import paths
 PROMPT_RX = re.compile(r"\n(\[confirm [0-9]+\] )?\*?> ")	# the prompt, P3A's markers too
 HERE = os.path.dirname(os.path.abspath(__file__))
 
@@ -19,7 +21,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("chip", nargs="?")
-    ap.add_argument("--rtlsim", default=os.path.join(HERE, "../../build/rtlsim"))
+    ap.add_argument("--rtlsim", default=paths.RTLSIM)
     a = ap.parse_args()
     root = os.environ.get("RTLSIM_IMAGES", os.path.expanduser("~/rtlsim/images"))
     found = sorted(glob.glob(os.path.join(root, "*", "SWGT024_V2_0_UNMANAGED-compact-boot.bin")),

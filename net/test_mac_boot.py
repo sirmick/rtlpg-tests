@@ -2,7 +2,7 @@
 """test_mac_boot.py - a `mac` line in the startup config must not leave the
 switch deaf (logicog/RTLPlayground #818).
 
-    tests/net/test_mac_boot.py IMAGE [--board FILE] [--rtlsim build/rtlsim] [--port 4]
+    net/test_mac_boot.py IMAGE [--board FILE] [--rtlsim build/rtlsim] [--port 4]
 
 IMAGE must carry a `mac` line in its startup config, e.g.
     make MACHINE=... CONFIG=cfg.txt   (cfg.txt: ip/gw/netmask plus "mac 8c:a6:82:70:9b:07")
@@ -16,6 +16,8 @@ received nothing until a reboot. Then it answers no ARP, also not after a live
 No sudo needed: the peer is this script on rtlsim's --nic socket.
 """
 import argparse, os, socket, struct, sys, tempfile, time
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "../lib"))
+import paths
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, "../fw"))
 from console import Console, PROMPT, DEFAULT_IP, switch_ip
@@ -87,7 +89,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("image")
     ap.add_argument("--board")
-    ap.add_argument("--rtlsim", default=os.path.join(HERE, "../../build/rtlsim"))
+    ap.add_argument("--rtlsim", default=paths.RTLSIM)
     ap.add_argument("--port", type=int, default=4)
     a = ap.parse_args()
 

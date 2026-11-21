@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """test_uip_hardening.py - a crafted TCP SYN must not hang the main loop.
 
-    tests/net/test_uip_hardening.py IMAGE [--rtlsim build/rtlsim]
+    net/test_uip_hardening.py IMAGE [--rtlsim build/rtlsim]
 
 uip_process() walks the TCP options of an incoming SYN with an 8-bit cursor
 and advances it by an attacker-controlled option length with no bound. A
@@ -24,6 +24,8 @@ an upstream-format image or our compact build. No privileges needed - frames
 go straight onto the --nic socket.
 """
 import argparse, os, struct, sys, tempfile
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "../lib"))
+import paths
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, "../fw"))
 from console import Console, PROMPT, switch_ip, peer_ip
@@ -63,7 +65,7 @@ def alive(p):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("image")
-    ap.add_argument("--rtlsim", default=os.path.join(HERE, "../../build/rtlsim"))
+    ap.add_argument("--rtlsim", default=paths.RTLSIM)
     a = ap.parse_args()
 
     with tempfile.TemporaryDirectory() as d:

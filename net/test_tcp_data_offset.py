@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """test_tcp_data_offset.py - TCP data-offset underflow in uIP.
 
-    tests/net/test_tcp_data_offset.py IMAGE [--rtlsim build/rtlsim]
+    net/test_tcp_data_offset.py IMAGE [--rtlsim build/rtlsim]
 
 uip_process() computes the TCP payload length as
     uip_len = uip_len - (data_offset * 4) - UIP_IPH_LEN;
@@ -20,6 +20,8 @@ The switch IP is read from the firmware (switch_ip), so this runs unchanged on
 an upstream-format image or our compact build. No privileges needed.
 """
 import argparse, os, struct, sys, tempfile
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "../lib"))
+import paths
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, "../fw"))
 from console import Console, PROMPT, switch_ip, peer_ip
@@ -58,7 +60,7 @@ def recv_tcp(p, timeout=2.0):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("image")
-    ap.add_argument("--rtlsim", default=os.path.join(HERE, "../../build/rtlsim"))
+    ap.add_argument("--rtlsim", default=paths.RTLSIM)
     a = ap.parse_args()
 
     with tempfile.TemporaryDirectory() as d:

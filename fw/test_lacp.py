@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """test_lacp.py - LACP against a partner, in rtlsim --control.
 
-    tests/fw/test_lacp.py IMAGE [--board FILE] [--rtlsim build/rtlsim]
+    fw/test_lacp.py IMAGE [--board FILE] [--rtlsim build/rtlsim]
 
 The partner (tests/oldnew/lacp_partner.py) is on front ports 2 and 3, and
 `lag 1 lacp 2 3` puts them under LACP (an object-model image, which answers
@@ -20,6 +20,8 @@ and state.lag in place of lacp show):
 The run is twice; both transcripts must be the same.
 """
 import argparse, json, os, re, sys
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "../lib"))
+import paths
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, "../oldnew"))
 from bench import Bench, PROMPT
@@ -86,7 +88,7 @@ def show(b, fronts=None):
 
 
 def session(a):
-    board = a.board or os.path.join(HERE, "../../boards/swgt024_v2_0_unmanaged.json")	# rtlsim's default
+    board = a.board or os.path.join(paths.OVS, "boards/swgt024_v2_0_unmanaged.json")	# rtlsim's default
     fronts = [p for p in json.load(open(board))["ports"] if "sfp" not in p]
     (pa, fa), (pb, fb) = [(p["phys"], p["front"]) for p in fronts[1:3]]
     b = Bench(a.image, board=a.board, rtlsim=a.rtlsim)
@@ -161,7 +163,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("image")
     ap.add_argument("--board")
-    ap.add_argument("--rtlsim", default=os.path.join(HERE, "../../build/rtlsim"))
+    ap.add_argument("--rtlsim", default=paths.RTLSIM)
     a = ap.parse_args()
     f, log = session(a)
     members = int(f["lag"][2], 16) if f["lag"] else 0

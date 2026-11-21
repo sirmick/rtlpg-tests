@@ -2,7 +2,7 @@
 """test_ldr852.py - a power cut at every step of an install by the loader of
 RTLPlayground PR #852 (DrDoof's feat/bootloader).
 
-    tests/flash/test_ldr852.py BOOT_A APP_B --board FILE [--rtlsim build/rtlsim]
+    flash/test_ldr852.py BOOT_A APP_B --board FILE [--rtlsim build/rtlsim]
                                [--every-op] [--range A-B] [--jobs N] [--list FILE]
 
 BOOT_A is a `make LOADER=1` boot image (loader + application A), APP_B the
@@ -21,6 +21,8 @@ there, followed by up to 4 power-ons. A cut ends:
 The loader never rewrites itself here, so no cut should be dead.
 """
 import argparse, concurrent.futures, os, sys, tempfile
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "../lib"))
+import paths
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from flashlab import Scenario, ops_of, sweep, sampled, by_sector, ranges, SECTOR
 
@@ -114,7 +116,7 @@ def main():
     ap.add_argument("boot_a")
     ap.add_argument("app_b")
     ap.add_argument("--board", required=True)
-    ap.add_argument("--rtlsim", default=os.path.join(os.path.dirname(__file__), "../../build/rtlsim"))
+    ap.add_argument("--rtlsim", default=paths.RTLSIM)
     ap.add_argument("--every-op", action="store_true")
     ap.add_argument("--range")
     ap.add_argument("--jobs", type=int, default=os.cpu_count())

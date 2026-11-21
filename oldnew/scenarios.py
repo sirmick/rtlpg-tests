@@ -13,9 +13,12 @@ the SFP cages. The host (the harness's HTTP client) is on front port 1,
 r.P[0]. Four copper ports are enough for every scenario.
 """
 import os, re, subprocess, tempfile
+import sys
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "../lib"))
+import paths
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-TOOLS = os.path.join(HERE, "..", "..", "tools")
+TOOLS = os.path.join(paths.OVS, "tools")
 
 
 def _sfp(speed):

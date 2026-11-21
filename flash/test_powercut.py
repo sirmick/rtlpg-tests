@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """test_powercut.py - a power cut at every step of a firmware install.
 
-    tests/flash/test_powercut.py NEW [--old OLD] [--rtlsim build/rtlsim]
+    flash/test_powercut.py NEW [--old OLD] [--rtlsim build/rtlsim]
                                  [--every-op] [--range A-B] [--jobs N] [--list FILE]
 
 A switch runs OLD (default: NEW) on a 512 KiB flash, with its config
@@ -29,6 +29,8 @@ Layout: compact (CONFIG_START 0x7f000, UPLOAD_START 0x40000, UPDATE_PROGRESS
 off install (before dev e3347e6) shows it as dead cuts all over.
 """
 import argparse, collections, concurrent.futures, os, re, shutil, subprocess, sys, tempfile, threading, time
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "../lib"))
+import paths
 PROMPT_RX = re.compile(r"\n(\[confirm [0-9]+\] )?\*?> ")	# the prompt, P3A's markers too
 
 CHIP = 0x80000
@@ -73,7 +75,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("new")
     ap.add_argument("--old")
-    ap.add_argument("--rtlsim", default=os.path.join(os.path.dirname(os.path.abspath(__file__)), "../../build/rtlsim"))
+    ap.add_argument("--rtlsim", default=paths.RTLSIM)
     ap.add_argument("--every-op", action="store_true")
     ap.add_argument("--range", help="only cut points A-B (operation numbers)")
     ap.add_argument("--jobs", type=int, default=max(1, (os.cpu_count() or 2) // 2))

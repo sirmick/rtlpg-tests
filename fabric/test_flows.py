@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """test_flows.py - the flow sets the firmware's configurations compile to.
 
-    tests/fabric/test_flows.py IMAGE [--board BOARD] [--rtlsim build/rtlsim] [--update]
+    fabric/test_flows.py IMAGE [--board BOARD] [--rtlsim build/rtlsim] [--update]
 
 Each case boots IMAGE, runs CLI commands, ends the session and compares
 rtlsim's --print-flows (fabric/compiler.h) with golden/CASE.flows (with
@@ -11,6 +11,8 @@ old commands; the two configure the same and compare with the same golden.
 --update rewrites the golden files from this run; review the diff.
 """
 import argparse, difflib, os, sys
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "../lib"))
+import paths
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, "../fw"))
 from console import Console, PROMPT
@@ -52,7 +54,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("image")
     ap.add_argument("--board")
-    ap.add_argument("--rtlsim", default=os.path.join(HERE, "../../build/rtlsim"))
+    ap.add_argument("--rtlsim", default=paths.RTLSIM)
     ap.add_argument("--update", action="store_true")
     a = ap.parse_args()
     failures = 0

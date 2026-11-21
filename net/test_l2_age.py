@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """test_l2_age.py - an L2 entry with age 0 isn't valid: the CPU's frames to it flood.
 
-    tests/net/test_l2_age.py IMAGE [--board BOARD] [--rtlsim build/rtlsim]
+    net/test_l2_age.py IMAGE [--board BOARD] [--rtlsim build/rtlsim]
 
 A peer on the first copper port opens a TCP connection to the web server and
 never ACKs, so uIP retransmits its SYN-ACK with no frame from the peer. Before
@@ -12,8 +12,10 @@ reaches the peer's port. A valid entry (age 7) on the second port sends it
 there alone.
 """
 import argparse, json, os, re, struct, sys
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "../lib"))
+import paths
 HERE = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, os.path.join(HERE, ".."))
+sys.path.insert(0, os.path.join(paths.OVS, "tests"))
 sys.path.insert(0, os.path.join(HERE, "../fw"))
 from rtlsim_ctl import Sim
 from console import DEFAULT_IP, peer_ip
@@ -33,7 +35,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("image")
     ap.add_argument("--board")
-    ap.add_argument("--rtlsim", default=os.path.join(HERE, "../../build/rtlsim"))
+    ap.add_argument("--rtlsim", default=paths.RTLSIM)
     a = ap.parse_args()
     ports = json.load(open(a.board))["ports"] if a.board else [{"phys": p} for p in (4, 5, 6, 7)]
     pa, pb = [p["phys"] for p in ports if "sfp" not in p][:2]

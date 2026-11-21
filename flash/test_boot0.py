@@ -2,7 +2,7 @@
 """test_boot0.py - an install's resets boot through, and a cut mid-copy
 resumes: the late install reset and boot0's early resume reset.
 
-    tests/flash/test_boot0.py IMAGE [--new NEW] [--board FILE] [--rtlsim build/rtlsim]
+    flash/test_boot0.py IMAGE [--new NEW] [--board FILE] [--rtlsim build/rtlsim]
 
 A switch runs IMAGE, with NEW (default IMAGE) staged as a finished web
 upload leaves it (at 0x40000, then a 0). Two runs:
@@ -27,6 +27,8 @@ issued before setup_clock()).
 Needs an image that installs web updates (dev e3347e6 and later).
 """
 import argparse, os, re, shutil, subprocess, sys, tempfile
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "../lib"))
+import paths
 PROMPT_RX = re.compile(r"\n(\[confirm [0-9]+\] )?\*?> ")	# the prompt, P3A's markers too
 HERE = os.path.dirname(os.path.abspath(__file__))
 UPLOAD, PROGRESS, CONFIG, SECTOR, HOME_BANK = 0x40000, 0x7e000, 0x7f000, 0x1000, 0x4000
@@ -68,7 +70,7 @@ def main():
     ap.add_argument("image")
     ap.add_argument("--new", help="the image to install (default: IMAGE itself)")
     ap.add_argument("--board")
-    ap.add_argument("--rtlsim", default=os.path.join(HERE, "../../build/rtlsim"))
+    ap.add_argument("--rtlsim", default=paths.RTLSIM)
     a = ap.parse_args()
     img = open(a.image, "rb").read()
     new = open(a.new or a.image, "rb").read()

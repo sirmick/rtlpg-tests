@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """test_pse.py - the POE-2G040210GSM's firmware loads its PoE controller.
 
-    tests/flash/test_pse.py [IMAGE] [--rtlsim build/rtlsim]
+    flash/test_pse.py [IMAGE] [--rtlsim build/rtlsim]
 
 IMAGE is a POE_2G040210GSM compact build (default: the newest in
 $RTLSIM_IMAGES, ~/rtlsim/images/*/; skipped without one). The test makes its
@@ -14,8 +14,10 @@ load ok"; with the chip type reading 2 it sends image 1 instead; the alternate
 arming works; without machine data it leaves PoE off.
 """
 import argparse, glob, os, random, struct, subprocess, sys, tempfile
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "../lib"))
+import paths
 HERE = os.path.dirname(os.path.abspath(__file__))
-BOARD = os.path.join(HERE, "../../boards/poe_2g040210gsm.json")
+BOARD = os.path.join(paths.OVS, "boards/poe_2g040210gsm.json")
 failures = 0
 
 
@@ -44,7 +46,7 @@ def region(img0, img1):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("image", nargs="?")
-    ap.add_argument("--rtlsim", default=os.path.join(HERE, "../../build/rtlsim"))
+    ap.add_argument("--rtlsim", default=paths.RTLSIM)
     a = ap.parse_args()
     root = os.environ.get("RTLSIM_IMAGES", os.path.expanduser("~/rtlsim/images"))
     found = sorted(glob.glob(os.path.join(root, "*", "POE_2G040210GSM-compact.bin")), key=os.path.getmtime)

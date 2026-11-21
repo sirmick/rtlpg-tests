@@ -12,9 +12,11 @@ The switch is left with igmp off. Needs root (raw sockets) and scapy.
 """
 import os
 import sys
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "../../lib"))
+import paths
 import time
 
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "../../../tools"))
+sys.path.insert(0, os.path.join(paths.OVS, "tools"))
 from hwprobe import Switch  # noqa: E402
 
 from scapy.all import AsyncSniffer, Ether, IP, UDP, Raw, conf, get_if_hwaddr, sendp  # noqa: E402

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """test_update.py - a firmware update through the web UI, on a persistent flash.
 
-    tests/net/test_update.py IMAGE [--rtlsim build/rtlsim]
+    net/test_update.py IMAGE [--rtlsim build/rtlsim]
 
 The switch boots IMAGE on a --flash file; Linux in a private network
 namespace (a tap on the --nic socket, as test_net.py) logs in and uploads
@@ -23,6 +23,8 @@ clock from its boot (rtlsim --realtime), and the test knows the firmware's
 time. Needs sudo; skipped without it. Real time: ~1.5 min.
 """
 import argparse, os, re, shutil, subprocess, sys, tempfile, time
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "../lib"))
+import paths
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, "../fw"))
 from console import Console, PROMPT
@@ -98,7 +100,7 @@ def boots(log):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("image")
-    ap.add_argument("--rtlsim", default=os.path.join(HERE, "../../build/rtlsim"))
+    ap.add_argument("--rtlsim", default=paths.RTLSIM)
     a = ap.parse_args()
     if subprocess.run(["sudo", "-n", "true"], capture_output=True).returncode:
         print("update: no passwordless sudo, skipped")

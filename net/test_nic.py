@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """test_nic.py - the CPU port's NIC with hand-made frames on the --nic socket.
 
-    tests/net/test_nic.py IMAGE [--board FILE] [--rtlsim build/rtlsim]
+    net/test_nic.py IMAGE [--board FILE] [--rtlsim build/rtlsim]
 
 No Linux stack and no privileges: frames go straight onto the socket. Checks
 ARP, ICMP echo and a TCP SYN to the web server get answers with the right
@@ -10,6 +10,8 @@ ASIC), that VLAN 1 replies leave port 1 untagged, and that a frame in a VLAN
 without the CPU never reaches it.
 """
 import argparse, json, os, re, socket, struct, subprocess, sys, tempfile, time
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "../lib"))
+import paths
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, "../fw"))
 from console import Console, PROMPT, DEFAULT_IP, switch_ip, peer_ip
@@ -91,7 +93,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("image")
     ap.add_argument("--board")
-    ap.add_argument("--rtlsim", default=os.path.join(HERE, "../../build/rtlsim"))
+    ap.add_argument("--rtlsim", default=paths.RTLSIM)
     a = ap.parse_args()
     # front port 1 (rtlsim's default board: the SWTG024AS, physical port 4)
     port = [p for p in json.load(open(a.board))["ports"] if "sfp" not in p][0]["phys"] if a.board else 4

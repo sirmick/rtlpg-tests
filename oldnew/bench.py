@@ -13,10 +13,12 @@ same firmware times whenever they sent it at the same times; a device's own
 timers (tick) run at the grid points too.
 """
 import os, re, struct, sys
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "../lib"))
+import paths
 from collections import Counter
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, os.path.join(HERE, ".."))
+sys.path.insert(0, os.path.join(paths.OVS, "tests"))
 from rtlsim_ctl import Sim, SimError
 
 GRID = 500			# µs between looks at the wire

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """test_cve_2020_17437.py - TCP urgent-pointer out-of-bounds in uIP.
 
-    tests/net/test_cve_2020_17437.py IMAGE [--rtlsim build/rtlsim]
+    net/test_cve_2020_17437.py IMAGE [--rtlsim build/rtlsim]
 
 CVE-2020-17437 (uIP 1.0, CVSS 8.2, AMNESIA:33). With UIP_URGDATA == 0 (how
 this firmware is built) uip_process() handles a URG segment by advancing
@@ -27,6 +27,8 @@ The switch IP is read from the firmware (switch_ip), so this runs unchanged
 on an upstream-format image or our compact build. No privileges needed.
 """
 import argparse, os, struct, sys, tempfile
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "../lib"))
+import paths
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, "../fw"))
 from console import Console, PROMPT, switch_ip, peer_ip
@@ -68,7 +70,7 @@ def recv_tcp(p, timeout=2.0):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("image")
-    ap.add_argument("--rtlsim", default=os.path.join(HERE, "../../build/rtlsim"))
+    ap.add_argument("--rtlsim", default=paths.RTLSIM)
     a = ap.parse_args()
 
     with tempfile.TemporaryDirectory() as d:

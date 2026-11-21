@@ -2,7 +2,7 @@
 """test_loader_update.py - a web update of a compact board that has the loader, on
 every board of the image matrix.
 
-    tests/flash/test_loader_update.py [--images DIR] [--rtlsim build/rtlsim]
+    flash/test_loader_update.py [--images DIR] [--rtlsim build/rtlsim]
 
 DIR is an image matrix (RTLPlayground's build for rtlsim, manifest.json;
 default the newest in $RTLSIM_IMAGES, ~/rtlsim/images). Per board, a chip the
@@ -24,6 +24,8 @@ no bank window wraps onto the loader (4 MiB), with the loader's copy where
 bank 0x3f shows it. Another power-on installs nothing.
 """
 import argparse, glob, json, os, shutil, sys, tempfile
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "../lib"))
+import paths
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import flashlab
@@ -78,7 +80,7 @@ def changed(app):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--images")
-    ap.add_argument("--rtlsim", default=os.path.join(HERE, "../../build/rtlsim"))
+    ap.add_argument("--rtlsim", default=paths.RTLSIM)
     a = ap.parse_args()
     root = os.environ.get("RTLSIM_IMAGES", os.path.expanduser("~/rtlsim/images"))
     dirs = sorted(glob.glob(os.path.join(root, "*", "manifest.json")), key=os.path.getmtime)
@@ -96,7 +98,7 @@ def main():
                 print(f"{machine}: no compact boot or install image, skipped")
                 continue
             size = SIZES[man[t]["flash"]]
-            bj = json.load(open(os.path.join(HERE, "../../boards", board))) if board else None
+            bj = json.load(open(os.path.join(paths.OVS, "boards", board))) if board else None
             if bj and not check(SIZES.get(bj["flash"]["size"]) == size,
                                 f"{machine}: the board's flash ({bj['flash']['size']}) is the build's ({man[t]['flash']})"):
                 continue
@@ -113,7 +115,7 @@ def main():
                 chip[MDATA:MDATA + len(md)] = md
             base = os.path.join(d, f"{machine}-base.bin")
             open(base, "wb").write(chip)
-            bp = os.path.join(HERE, "../../boards", board) if board else None
+            bp = os.path.join(paths.OVS, "boards", board) if board else None
             s = flashlab.Scenario(a.rtlsim, os.path.join(images, t + "-boot.bin"), base, bp)
             state, n, console = s.settle(base)
             if not check(state == "up" and "Starting application" in console,

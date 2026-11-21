@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """test_vm.py - the switch VM (build/vm/rtlsw.qcow2) under QEMU, as CI would.
 
-    tests/vm/test_vm.py [--image build/vm/rtlsw.qcow2] [--data build/vm/rtlsw-data.qcow2]
+    vm/test_vm.py [--image build/vm/rtlsw.qcow2] [--data build/vm/rtlsw-data.qcow2]
 
 No root, no host networking: the VM's NICs are -netdev stream sockets this
 test is the other end of, and the firmware's console is a socket too. Boots
@@ -14,6 +14,8 @@ it can.
 """
 import argparse, os, shutil, socket, struct, subprocess, sys, tempfile, time
 HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, os.path.join(HERE, "../lib"))
+import paths
 sys.path.insert(0, os.path.join(HERE, "../net"))
 from test_nic import Peer, eth, ip_bytes, PEER_MAC, PEER_IP, SWITCH_IP, SWITCH_MAC
 from console import DEFAULT_IP, peer_ip
@@ -89,7 +91,7 @@ class VM:
 
 def main():
     ap = argparse.ArgumentParser()
-    top = os.path.join(HERE, "../..")
+    top = paths.OVS
     ap.add_argument("--image", default=os.path.join(top, "build/vm/rtlsw.qcow2"))
     ap.add_argument("--data", default=os.path.join(top, "build/vm/rtlsw-data.qcow2"))
     a = ap.parse_args()

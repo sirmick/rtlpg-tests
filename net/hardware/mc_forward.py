@@ -22,9 +22,11 @@ Leaves the switch with igmp off and VLAN 1 PVIDs. Needs root and scapy.
 """
 import os
 import sys
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "../../lib"))
+import paths
 import time
 
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "../../../tools"))
+sys.path.insert(0, os.path.join(paths.OVS, "tools"))
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from hwprobe import Switch  # noqa: E402
 import mc_oracle as m  # noqa: E402
