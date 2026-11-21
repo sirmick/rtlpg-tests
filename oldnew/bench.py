@@ -20,6 +20,7 @@ from collections import Counter
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(paths.OVS, "tests"))
 from rtlsim_ctl import Sim, SimError
+from console import SWITCH_INIT
 
 GRID = 500			# µs between looks at the wire
 COARSE = 10000			# ... with no cable and nothing to wait for
@@ -92,7 +93,7 @@ def kind(f):
 class Bench:
     def __init__(self, image, board=None, rtlsim=None, args=()):
         kw = {"rtlsim": rtlsim} if rtlsim else {}
-        self.sim = Sim(image, board=board, args=["--quiet", *args], **kw)
+        self.sim = Sim(image, board=board, args=["--quiet", *SWITCH_INIT, *args], **kw)
         self.sim.nic_capture(True)
         self.now = 0
         self.frames = Counter()		# (port, kind) -> frames sent

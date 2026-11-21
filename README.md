@@ -48,7 +48,7 @@ that an update is safe on a real switch. The bench is the last gate.
 
 | Where | What |
 |---|---|
-| `lib/` | `paths.py` (where ovs-rtlpg and RTLPlayground are), `fwcli.py` (the two CLIs) |
+| `lib/` | `paths.py` (where ovs-rtlpg and RTLPlayground are), `console.py` (what the firmware's console looks like: prompt, address, MAC, the switch-init write), `fwcli.py` (the two CLIs) |
 | `fw/` | the boot against silicon, LACP, the NIC ring, the console ring, control mode's holds |
 | `net/` | Linux against the firmware: TCP/IP, switching, topologies, IGMP, loop detection, uIP hardening, web update; `hardware/` the same probes for a real switch |
 | `fabric/` | the flows the firmware's configurations compile to, against goldens |
@@ -56,3 +56,7 @@ that an update is safe on a real switch. The bench is the last gate.
 | `oldnew/` | the old-vs-new harness and its translation table |
 | `vm/` | the switch VM booting the image |
 | `ci/run.sh` | the tiers, as CI runs them |
+
+## Licence
+
+MIT (`LICENSE`).

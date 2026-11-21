@@ -18,7 +18,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(paths.OVS, "tests"))
 sys.path.insert(0, os.path.join(HERE, "../fw"))
 from rtlsim_ctl import Sim
-from console import DEFAULT_IP, peer_ip
+from console import DEFAULT_IP, SWITCH_INIT, peer_ip
 from test_nic import ip_bytes, csum, PEER_MAC, SWITCH_MAC
 
 PROMPT = r"\n(\[confirm [0-9]+\] )?\*?> $"
@@ -40,7 +40,7 @@ def main():
     ports = json.load(open(a.board))["ports"] if a.board else [{"phys": p} for p in (4, 5, 6, 7)]
     pa, pb = [p["phys"] for p in ports if "sfp" not in p][:2]
 
-    with Sim(a.image, board=a.board, rtlsim=a.rtlsim, stderr=open(os.devnull, "w")) as sim:
+    with Sim(a.image, board=a.board, rtlsim=a.rtlsim, args=SWITCH_INIT, stderr=open(os.devnull, "w")) as sim:
         def con(line):
             sim.uart_read()
             sim.uart_write(line + "\r")

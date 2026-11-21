@@ -25,6 +25,7 @@ nic-rx-full.
 import argparse, json, os, re, sys
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "../lib"))
 import paths
+from console import SWITCH_INIT
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(paths.OVS, "tests"))
 from rtlsim_ctl import Sim
@@ -61,7 +62,7 @@ def stream(sim, port, count, gap_ms):
 
 
 def session(a, ring=None):
-    args = ["--quiet"] + (["--nic-rx-ring", str(ring)] if ring else [])
+    args = ["--quiet", *SWITCH_INIT] + (["--nic-rx-ring", str(ring)] if ring else [])
     board = a.board or os.path.join(paths.OVS, "boards/swgt024_v2_0_unmanaged.json")	# rtlsim's default
     port = json.load(open(board))["ports"][0]["phys"]	# front port 1
     with Sim(a.image, board=a.board, rtlsim=a.rtlsim, args=args) as sim:

@@ -23,6 +23,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(paths.OVS, "tools"))
 from rtlswitch import Net
 import fwcli
+from console import PROMPT, boot_mac
 
 failures = 0
 IP = {"a": "192.168.2.2", "b": "192.168.2.3", "h1": "192.168.2.11", "h2": "192.168.2.12", "h3": "192.168.2.13"}
@@ -72,15 +73,18 @@ def main():
         return m.group(1) if m else "?"
 
     try:
-        net.start()
-        fw = {sw: fwcli.FwCli(fwcli.console_sender(net.labs[sw].console)) for sw in "ab"}
-        for sw in "ab":
-            fw[sw].config(f"ip {IP[sw]}")
+        fw = {}
+
+        def addresses(net):	# each switch its own, before the controllers attach
+            for sw in "ab":
+                fw[sw] = fwcli.FwCli(fwcli.console_sender(net.labs[sw].console))
+                fw[sw].config(f"ip {IP[sw]}")
+        net.start(ready=PROMPT, after_boot=addresses)
         time.sleep(1)
 
         def l2(sw):	# the l2 table, as "path value" text, either firmware's
             return "\n".join(f"{p} {v}" for p, v in fw[sw].read("l2").items())
-        ma, mb = net.mac("a"), net.mac("b")
+        ma, mb = boot_mac(net.labs["a"].console), boot_mac(net.labs["b"].console)
         check(ma and mb and ma != mb, f"the two chips have their own MACs: a {ma}, b {mb}")
         check(all(fw[sw].read("ip").get("state.mgmt.ip") == IP[sw] for sw in "ab"),
               f"each switch has its own address: a {IP['a']}, b {IP['b']}")

@@ -21,6 +21,8 @@ import paths
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(paths.OVS, "tools"))
 from rtlswitch import Net
+import fwcli
+from console import PROMPT
 
 failures = 0
 SW_IP, H1_IP = "192.168.2.2", "192.168.2.11"
@@ -49,8 +51,8 @@ def check(cond, msg):
     failures += not cond
 
 
-def state(net, phys):
-    out = net.cli("a", "regget 5310")
+def state(fw, phys):
+    out = fw.cmd("regget 5310")
     m = re.search(r"VAL: 0x([0-9a-f]+)", out)
     return (int(m.group(1), 16) >> (2 * phys)) & 3 if m else None
 
@@ -73,19 +75,25 @@ def main():
     if subprocess.run(["sudo", "-n", "true"], capture_output=True).returncode:
         print("loop: no passwordless sudo, skipped")
         return 0
-    topo = {"switches": {"a": {"ip": SW_IP}},
+    topo = {"switches": {"a": {}},
             "links": [["a.3", "a.4"]],
             "hosts": {"h1": {"port": "a.1", "ip": H1_IP + "/24"}}}
     net = Net(a.image, topo, a.rtlsim, prefix=f"l{os.getpid() % 10000}", stderr=open(os.devnull, "w"))
     try:
-        net.start()
+        fw = None
+
+        def address(net):
+            nonlocal fw
+            fw = fwcli.FwCli(fwcli.console_sender(net.labs["a"].console))
+            fw.config(f"ip {SW_IP}")
+        net.start(ready=PROMPT, after_boot=address)
         net.link("a.3", False)
         time.sleep(1)
-        net.cli("a", "loop on")
+        fw.config("loop on")
         net.link("a.3", True)
         check(wait_for(net, r"Loop: port 3 to port 4, blocking port 4", 10),
               "plugged in: the firmware reports the loop and blocks port 4")
-        check(state(net, PHYS["4"]) == 1 and state(net, PHYS["3"]) == 3,
+        check(state(fw, PHYS["4"]) == 1 and state(fw, PHYS["3"]) == 3,
               "MSTP_STATES: port 4 blocking, port 3 forwarding")
         r = net.sh("h1", "python3", "-c", BCAST, timeout=20)
         copies = r.stdout.strip()
@@ -104,9 +112,9 @@ def main():
 
         net.link("a.3", False)
         check(wait_for(net, r"Loop on port 4 gone", 15), "unplugged: the firmware reports the loop gone")
-        check(state(net, PHYS["4"]) == 3, "and unblocks port 4")
+        check(state(fw, PHYS["4"]) == 3, "and unblocks port 4")
 
-        net.cli("a", "stp on")
+        fw.config("stp on")
         net.link("a.3", True)
         check(wait_for(net, r"\(STP is on: not blocked\)", 10), "with STP on, a loop is reported, not blocked by RLDP")
     finally:
