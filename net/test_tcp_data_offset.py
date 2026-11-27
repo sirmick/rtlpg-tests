@@ -16,6 +16,11 @@ connection to the web server, send a 1-byte segment that claims data offset
 runs off the end and the switch stops answering); patched, the segment is
 dropped and the connection is untouched.
 
+The other way round, a data offset below 5 (shorter than the 20-byte base
+header) makes uip_len longer than the segment: 4 bytes sent with data offset 4
+are acknowledged as 8. Patched, that segment is dropped too; a 1-byte segment
+after it then reads rcv_nxt back.
+
 The switch IP is read from the firmware (switch_ip), so this runs unchanged on
 an upstream-format image or our compact build. No privileges needed.
 """
@@ -96,6 +101,18 @@ def main():
                   + ("" if r else " (no reply)"))
             check(advance <= 1, f"an oversized data offset does not underflow uip_len "
                   f"(rcv_nxt +{advance}, not the ~65500 of the unchecked subtraction)")
+
+            # 4 bytes of data, but the header claims a 16-byte TCP header.
+            p.send(eth(SWITCH_MAC, 0x0800, ipv4(6, tcp(ISN + 1, sw_isn + 1, 0x18, offset_words=4, payload=b"abcd"))))
+            recv_tcp(p, timeout=3)
+            # Then one ordinary byte: its ACK shows where rcv_nxt stands.
+            p.send(eth(SWITCH_MAC, 0x0800, ipv4(6, tcp(ISN + 1, sw_isn + 1, 0x18, payload=b"A"))))
+            r = recv_tcp(p, timeout=3)
+            advance = (r[1] - (ISN + 1)) & 0xffffffff if r else None
+            print(f"after 4 bytes at data offset 4 and 1 ordinary byte, the switch "
+                  f"acknowledged rcv_nxt +{advance}" if r else "no ACK for the ordinary byte")
+            check(advance == 1, f"a data offset below 5 is dropped (rcv_nxt +{advance}; "
+                  f"+8 means the 4 bytes were taken as 8)")
 
             p.send(eth(b"\xff" * 6, 0x0806, arp))
             check(p.reply(0x0806, timeout=2) is not None, "switch is still running afterwards")
